@@ -1,7 +1,7 @@
 import requests
 import os
 
-GITLAB_TOKEN = "glpat-esXJcfJIL054scVfxV-1lWM6MQpvOjEKdTpuNXY2MA8.01.171uwyzdt"  # your GitLab personal access token
+GITLAB_TOKEN =  os.environ.get("GITLAB_TOKEN")  # your GitLab personal access token
 GITLAB_URL = "https://gitlab.com/api/v4"
 
 headers = {

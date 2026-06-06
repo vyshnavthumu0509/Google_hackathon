@@ -6,10 +6,7 @@ import re
 import google.generativeai as genai
 
 app = Flask(__name__)
-"""
-GITLAB_TOKEN = "glpat-j4UMxNe4DnR-Rsr8fBfJp2M6MQpvOjEKdTpuNW91cw8.01.170mosymn"
-GEMINI_API_KEY = "AQ.Ab8RN6J2gIUS6owQ-T7fK2HEJWlikSSSGIod4_QevNYWUL8n3A"
-"""
+
 GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 

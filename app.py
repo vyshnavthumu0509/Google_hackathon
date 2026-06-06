@@ -1,20 +1,44 @@
 from flask import Flask, request
-import requests
-import os
-import json
-import re
-import google.generativeai as genai
+import threading
+import Gitlab_helper
+import Reviewers
 
 app = Flask(__name__)
 
-GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+def process_review_in_background(project_id, mr_iid):
+    """This runs in the background so we don't keep GitLab waiting!"""
+    print(f"\n--- 🚀 Background processing started for PR #{mr_iid} ---")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+    print("Fetching code diff from GitLab...")
+    diff_text = Gitlab_helper.get_diff(project_id, mr_iid)
+    print(f"🔍 DEBUG - Diff Length: {len(diff_text)} characters") # Add this line
+    print(f"🔍 DEBUG - Diff Content:\n{diff_text}") # Add this line
+    
+    if not diff_text:
+        print("❌ No diff found or error fetching diff.")
+        return
 
-headers = {"PRIVATE-TOKEN": GITLAB_TOKEN}
-GITLAB_URL = "https://gitlab.com/api/v4"
+    print("🧠 Sending code to Gemini for analysis...")
+    issues = Reviewers.analyse_code(diff_text)
+
+    if issues:
+        print(f"🎯 Found {len(issues)} issues! Posting inline comments...")
+        for item in issues:
+            file_path = item.get('file')
+            line = item.get('line')
+            severity = item.get('severity', 'warning').upper()
+            issue_desc = item.get('issue')
+            fix = item.get('fix')
+            
+            comment_body = f"**[{severity}]** {issue_desc}\n\n💡 *Fix suggestion:* {fix}"
+            Gitlab_helper.post_comment(project_id, mr_iid, file_path, line, comment_body)
+    else:
+        print("✅ Code looks clean, no issues found.")
+
+    print("📝 Posting final summary...")
+    Gitlab_helper.post_summary(project_id, mr_iid, issues)
+    print(f"✅ Review complete for PR #{mr_iid}!\n")
+
 
 @app.route('/')
 def home():
@@ -24,31 +48,19 @@ def home():
 def webhook():
     data = request.json
 
-    # ignore if not a merge request
+    # Ignore if not a merge request
     if data.get('object_kind') != 'merge_request':
         return "ok"
 
     project_id = data['project']['id']
     mr_iid = data['object_attributes']['iid']
 
-    # get the diff
-    url = f"{GITLAB_URL}/projects/{project_id}/merge_requests/{mr_iid}/diffs"
-    diff_response = requests.get(url, headers=headers).json()
-    
-    diff_text = ""
-    for d in diff_response:
-        diff_text += f"\nFile: {d['new_path']}\n{d['diff']}"
+    # 🚀 Start the background thread
+    thread = threading.Thread(target=process_review_in_background, args=(project_id, mr_iid))
+    thread.start()
 
-    # send to gemini
-    prompt = f"Review this code diff and list any bugs or issues in simple bullet points:\n{diff_text}"
-    result = model.generate_content(prompt)
-    review = result.text
-
-    # post comment on the MR
-    comment_url = f"{GITLAB_URL}/projects/{project_id}/merge_requests/{mr_iid}/notes"
-    requests.post(comment_url, headers=headers, json={"body": f"## 🤖 AI Review\n{review}"})
-
-    return "done"
+    # ⚡ Immediately tell GitLab "We received it!" to prevent the Timeout Error
+    return "Processing started", 200
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

@@ -3,10 +3,10 @@ import os
 import json
 import re
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")  # your Gemini API key
+GEMINI_API_KEY = "AQ.Ab8RN6LEQAT7jjwCzdZpTUrnzWeWM37dI2oy9Zhj96tFjYAYtA"  # your Gemini API key
 genai.configure(api_key=GEMINI_API_KEY)
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 def analyse_code(diff_text):
@@ -53,6 +53,7 @@ IMPORTANT: Return ONLY the JSON array. No other text."""
     try:
         response = model.generate_content(prompt)
         raw_text = response.text.strip()
+        print(f"🤖 DEBUG - Gemini Raw Reply: {raw_text}") # Add this line
 
         # Clean up response in case Gemini adds markdown backticks
         raw_text = re.sub(r'^```json\s*', '', raw_text)

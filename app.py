@@ -1,66 +1,35 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import threading
-import Gitlab_helper
+import asyncio
 import Reviewers
 
 app = Flask(__name__)
 
-def process_review_in_background(project_id, mr_iid):
-    """This runs in the background so we don't keep GitLab waiting!"""
-    print(f"\n--- 🚀 Background processing started for PR #{mr_iid} ---")
-
-    print("Fetching code diff from GitLab...")
-    diff_text = Gitlab_helper.get_diff(project_id, mr_iid)
-    print(f"🔍 DEBUG - Diff Length: {len(diff_text)} characters") # Add this line
-    print(f"🔍 DEBUG - Diff Content:\n{diff_text}") # Add this line
+def run_async_agent(event_type, payload):
+    """Background worker to handle the agent execution asynchronously"""
+    # Create a new event loop for this background thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
-    if not diff_text:
-        print("❌ No diff found or error fetching diff.")
-        return
-
-    print("🧠 Sending code to Gemini for analysis...")
-    issues = Reviewers.analyse_code(diff_text)
-
-    if issues:
-        print(f"🎯 Found {len(issues)} issues! Posting inline comments...")
-        for item in issues:
-            file_path = item.get('file')
-            line = item.get('line')
-            severity = item.get('severity', 'warning').upper()
-            issue_desc = item.get('issue')
-            fix = item.get('fix')
-            
-            comment_body = f"**[{severity}]** {issue_desc}\n\n💡 *Fix suggestion:* {fix}"
-            Gitlab_helper.post_comment(project_id, mr_iid, file_path, line, comment_body)
-    else:
-        print("✅ Code looks clean, no issues found.")
-
-    print("📝 Posting final summary...")
-    Gitlab_helper.post_summary(project_id, mr_iid, issues)
-    print(f"✅ Review complete for PR #{mr_iid}!\n")
-
-
-@app.route('/')
-def home():
-    return "Agent is running!"
+    # Pass the event type and raw payload to the agent
+    loop.run_until_complete(Reviewers.run_agent(event_type, payload))
+    loop.close()
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.json
+    # Detect what kind of action happened in GitLab
+    event_type = request.headers.get('X-Gitlab-Event')
+    payload = request.json
 
-    # Ignore if not a merge request
-    if data.get('object_kind') != 'merge_request':
-        return "ok"
+    if not event_type:
+        return jsonify({"status": "ignored", "reason": "Missing event header"}), 400
 
-    project_id = data['project']['id']
-    mr_iid = data['object_attributes']['iid']
+    print(f"🚀 Received GitLab Event: {event_type}")
 
-    # 🚀 Start the background thread
-    thread = threading.Thread(target=process_review_in_background, args=(project_id, mr_iid))
-    thread.start()
+    # Immediately hand off to a background thread to prevent GitLab timeouts (200 OK)
+    threading.Thread(target=run_async_agent, args=(event_type, payload)).start()
 
-    # ⚡ Immediately tell GitLab "We received it!" to prevent the Timeout Error
-    return "Processing started", 200
+    return jsonify({"status": "accepted", "message": "Agent processing started"}), 200
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(debug=True, port=5000)

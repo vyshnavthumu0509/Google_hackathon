@@ -79,7 +79,6 @@ export GITLAB_TOKEN="your_gitlab_personal_access_token"
 export GEMINI_API_KEY="your_gemini_api_key"
 ```
 
-> ⚠️ **Security Note:** The current code hardcodes credentials directly in `Reviewers.py`. Before deploying to any shared or production environment, replace the hardcoded values with `os.environ.get("GITLAB_TOKEN")` and `os.environ.get("GEMINI_API_KEY")`.
 
 ### 3. Start the Agent
 

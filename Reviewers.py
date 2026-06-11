@@ -29,8 +29,8 @@ def send_with_retry(chat, message, max_retries=15, base_wait=10):
 
 
 # ── Credentials ────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = "AQ.Ab8RN6KGcJpuOvVZK6GJoFxvnYX1e4Y2krndxT0WT7rypvRXPA"
-GITLAB_TOKEN   = "glpat-laSPs0vkADV2Y-W5F7RGdGM6MQpvOjEKdTpuOThkcQ8.01.17190gytn"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GITLAB_TOKEN   = os.environ.get("GITLAB_TOKEN")
 
 client   = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_ID = "gemini-2.5-flash"

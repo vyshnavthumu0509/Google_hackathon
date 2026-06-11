@@ -29,7 +29,7 @@ def send_with_retry(chat, message, max_retries=15, base_wait=10):
 
 
 # ── Credentials ────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = "AQ.Ab8RN6L3YPIRQjf1KjqtX85zi57QO6NoRS0q9Wyx-VI9bqk5pw"
+GEMINI_API_KEY = "AQ.Ab8RN6KGcJpuOvVZK6GJoFxvnYX1e4Y2krndxT0WT7rypvRXPA"
 GITLAB_TOKEN   = "glpat-laSPs0vkADV2Y-W5F7RGdGM6MQpvOjEKdTpuOThkcQ8.01.17190gytn"
 
 client   = genai.Client(api_key=GEMINI_API_KEY)

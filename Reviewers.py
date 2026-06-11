@@ -29,8 +29,8 @@ def send_with_retry(chat, message, max_retries=15, base_wait=10):
 
 
 # ── Credentials ────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = "AIzaSyC9fIzoFOuWss3VZHnzYiDyKZ6ys2Sn-s8"
-GITLAB_TOKEN   = "glpat-fZ3N8BoJ387fadtq1lOnX2M6MQpvOjEKdTptd3Nrcw8.01.1709h8at4"
+GEMINI_API_KEY = "AQ.Ab8RN6L3YPIRQjf1KjqtX85zi57QO6NoRS0q9Wyx-VI9bqk5pw"
+GITLAB_TOKEN   = "glpat-laSPs0vkADV2Y-W5F7RGdGM6MQpvOjEKdTpuOThkcQ8.01.17190gytn"
 
 client   = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_ID = "gemini-2.5-flash"
@@ -484,19 +484,41 @@ async def run_agent(event_type: str, payload: dict):
 
             elif event_type == "Note Hook":
                 comment_body = payload.get("object_attributes", {}).get("note", "")
-                mr_iid       = payload.get("merge_request", {}).get("iid")
+                
+                # Check exactly where this comment lives
+                mr_iid = payload.get("merge_request", {}).get("iid")
+                issue_iid = payload.get("issue", {}).get("iid")
+                commit_sha = payload.get("commit", {}).get("id") or payload.get("object_attributes", {}).get("commit_id")
 
                 if "@review-bot" not in comment_body.lower():
                     print("💬 Comment does not mention @review-bot — ignoring.")
                     return
 
-                mission = (
-                    f"You were mentioned in a comment on MR #{mr_iid} in Project {project_id}. "
-                    f"The user said: '{comment_body}'. "
-                    f"Call get_readme for project context, get_mr_diff to read the code, "
-                    f"then reply with post_mr_comment addressing the user's question directly."
-                )
-
+                # Route the mission dynamically based on comment location
+                if mr_iid:
+                    mission = (
+                        f"You were mentioned in a comment on MR #{mr_iid} in Project {project_id}. "
+                        f"The user said: '{comment_body}'. "
+                        f"Call get_readme for project context, get_mr_diff to read the code, "
+                        f"then reply with post_mr_comment addressing the user's question directly."
+                    )
+                elif issue_iid:
+                    mission = (
+                        f"You were mentioned in a comment on Issue #{issue_iid} in Project {project_id}. "
+                        f"The user said: '{comment_body}'. "
+                        f"Use your MCP tools to check the issue description and reply contextually."
+                    )
+                elif commit_sha:
+                    mission = (
+                        f"You were mentioned in a comment on Commit {commit_sha} in Project {project_id}. "
+                        f"The user said: '{comment_body}'. "
+                        f"Call get_readme for project context, get_commit_diff to read the commit, "
+                        f"then reply with post_commit_comment addressing the user's question."
+                    )
+                else:
+                    print("⚠️ Unknown Note Hook target. Could not find MR, Issue, or Commit ID.")
+                    return
+                
             else:
                 print(f"⚠️  Unhandled event '{event_type}' — ignoring.")
                 return
